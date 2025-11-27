@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Mechanical Circulatory Support Evidence Synthesis Dashboard">
+    <title>MCS-Logic v4.1 | Evidence Synthesis</title>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0d12;
+            --bg-secondary: #12171f;
+            --bg-tertiary: #1a2130;
+            --bg-card: #161d2a;
+            --border-color: #2a3444;
+            --text-primary: #f0f4f8;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            /* Semantic Colors */
+            --accent-cyan: #06b6d4;      /* Impella */
+            --accent-purple: #8b5cf6;    /* ECMO */
+            --accent-blue: #3b82f6;      /* Tandem */
+            --accent-orange: #f97316;    /* IABP/Bleeding/Warning */
+            --accent-success: #22c55e;   /* Benefit */
+            --accent-danger: #ef4444;    /* Harm */
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* --- Responsive Layout Architecture --- */
+        .app-container {
+            display: grid;
+            grid-template-columns: 360px 1fr 400px;
+            grid-template-rows: 100vh;
+            gap: 1px;
+            background: var(--border-color);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        @media (max-width: 1400px) {
+            .app-container {
+                grid-template-columns: 320px 1fr 360px;
+            }
+        }
+        
+        @media (max-width: 1100px) {
+            .app-container {
+                grid-template-columns: 320px 1fr;
+                grid-template-rows: auto 1fr;
+                height: auto;
+                overflow: visible;
+            }
+            .panel:last-child {
+                grid-column: 1 / -1;
+                border-top: 1px solid var(--border-color);
+                max-height: none;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .app-container {
+                display: flex;
+                flex-direction: column;
+                height: auto;
+                overflow: visible;
+            }
+            .panel {
+                max-height: none;
+                overflow: visible;
+            }
+            .forest-container {
+                min-height: 400px;
+            }
+            .results-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .results-grid .result-card:last-child {
+                grid-column: 1 / -1;
+            }
+        }
+        
+        /* --- Panels --- */
+        .panel {
+            background: var(--bg-secondary);
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel-header {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .version-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            background: var(--accent-success);
+            color: var(--bg-primary);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        /* --- Scrollbars --- */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+        
+        /* --- Components --- */
+        .section-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin: 24px 0 12px;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        /* Trial Cards */
+        .trial-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .trial-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            user-select: none;
+        }
+        
+        .trial-item:hover { border-color: var(--accent-cyan); transform: translateX(2px); }
+        .trial-item.selected { border-color: var(--accent-cyan); background: rgba(6, 182, 212, 0.05); }
+        .trial-item.excluded { opacity: 0.4; pointer-events: none; filter: grayscale(1); }
+        
+        /* Semantic Borders */
+        .trial-item.trial-sig-positive { border-left: 3px solid var(--accent-success); }
+        .trial-item.trial-sig-neutral { border-left: 3px solid var(--text-muted); }
+        
+        .trial-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .trial-name { font-weight: 600; font-size: 0.9rem; }
+        .trial-year { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-muted); margin-left: 6px; }
+        
+        .trial-device {
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .device-ecmo { background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); border: 1px solid rgba(139, 92, 246, 0.3); }
+        .device-impella { background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.3); }
+        .device-tandem { background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); border: 1px solid rgba(59, 130, 246, 0.3); }
+        .device-iabp { background: rgba(249, 115, 22, 0.15); color: var(--accent-orange); border: 1px solid rgba(249, 115, 22, 0.3); }
+        
+        .trial-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 8px;
+        }
+        
+        .trial-stat { text-align: center; }
+        .trial-stat-value { font-size: 0.8rem; font-weight: 600; }
+        .trial-stat-label { font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase; margin-top: 2px;}
+        
+        /* Presets */
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .preset-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-align: left;
+        }
+        
+        .preset-btn:hover { border-color: var(--accent-cyan); color: var(--text-primary); }
+        .preset-btn.active { background: var(--accent-cyan); color: var(--bg-primary); border-color: var(--accent-cyan); }
+        
+        .preset-btn span {
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .preset-btn.active span { color: rgba(10, 13, 18, 0.7); }
+        
+        /* Center Panel (Forest Plot) */
+        .center-panel {
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        .forest-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-secondary);
+        }
+
+        .forest-title { font-weight: 600; font-size: 0.9rem; }
+        
+        .action-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        
+        .action-btn:hover { background: var(--bg-card); border-color: var(--text-secondary); }
+
+        .forest-container {
+            flex: 1;
+            padding: 20px;
+            position: relative;
+            cursor: crosshair;
+        }
+        
+        .forest-container canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Tooltip */
+        #forestTooltip {
+            position: absolute;
+            background: rgba(14, 18, 26, 0.95);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.1s;
+            font-size: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            min-width: 150px;
+        }
+        
+        #forestTooltip h4 { color: var(--accent-cyan); margin-bottom: 4px; }
+        #forestTooltip .tt-row { display: flex; justify-content: space-between; margin-bottom: 2px; color: var(--text-secondary); }
+        #forestTooltip .tt-val { font-family: 'JetBrains Mono', monospace; color: var(--text-primary); }
+
+        /* Results Grid */
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .result-card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 14px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .result-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .result-ci { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+        .result-label { font-size: 0.65rem; color: var(--text-secondary); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+        
+        .result-value.significant { color: var(--accent-success); }
+        .result-value.harm { color: var(--accent-danger); }
+        .result-value.neutral { color: var(--text-secondary); }
+        
+        /* Right Panel Viz */
+        .viz-card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .viz-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+        }
+        
+        /* Waffle Chart */
+        .waffle-container {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 2px;
+            margin-bottom: 12px;
+        }
+        
+        .waffle-cell {
+            aspect-ratio: 1;
+            border-radius: 2px;
+            background: var(--bg-tertiary);
+            transition: background 0.3s ease;
+        }
+        
+        /* GRADE Assessment */
+        .grade-card {
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            padding: 12px;
+            border-left: 3px solid var(--text-muted);
+            margin-bottom: 8px;
+        }
+        
+        .grade-level { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 700; margin-bottom: 4px; display: block;}
+        .grade-reason { font-size: 0.7rem; color: var(--text-secondary); }
+        
+        .grade-high { border-color: var(--accent-success); } .grade-high .grade-level { color: var(--accent-success); }
+        .grade-mod { border-color: var(--accent-warning); } .grade-mod .grade-level { color: var(--accent-warning); }
+        .grade-low { border-color: var(--accent-orange); } .grade-low .grade-level { color: var(--accent-orange); }
+        .grade-very-low { border-color: var(--accent-danger); } .grade-very-low .grade-level { color: var(--accent-danger); }
+
+        /* Sliders */
+        .slider-group { margin-bottom: 16px; }
+        .slider-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.75rem; }
+        .slider-value { font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); }
+        
+        input[type="range"] {
+            width: 100%; height: 4px; background: var(--bg-tertiary); border-radius: 2px; appearance: none; cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none; width: 14px; height: 14px; background: var(--accent-cyan); border-radius: 50%; cursor: pointer; border: 2px solid var(--bg-primary);
+        }
+        
+        /* Toggle */
+        .toggle-row {
+            display: flex; align-items: center; justify-content: space-between; padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .toggle {
+            width: 40px; height: 22px; background: var(--bg-tertiary); border-radius: 11px; position: relative; cursor: pointer; transition: background 0.2s;
+        }
+        .toggle.active { background: var(--accent-cyan); }
+        .toggle::after {
+            content: ''; position: absolute; width: 18px; height: 18px; background: white; border-radius: 50%; top: 2px; left: 2px; transition: left 0.2s;
+        }
+        .toggle.active::after { left: 20px; }
+
+        /* Alerts */
+        .alert-banner {
+            background: rgba(239, 68, 68, 0.1); border: 1px solid var(--accent-danger); border-radius: 6px; padding: 12px; margin-bottom: 12px; font-size: 0.75rem;
+        }
+        .alert-banner.warning { background: rgba(234, 179, 8, 0.1); border-color: var(--accent-warning); }
+        .alert-title { font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+        .alert-banner.warning .alert-title { color: var(--accent-warning); }
+        .alert-banner .alert-title { color: var(--accent-danger); }
+
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- LEFT PANEL: Configuration -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="header-left">
+                    MCS-Logic
+                    <span class="version-badge">v4.1</span>
+                </div>
+            </div>
+            
+            <div id="alertContainer"></div>
+            
+            <div class="section-title">Analysis Presets</div>
+            <div class="preset-grid">
+                <button class="preset-btn active" onclick="setPreset('lancet2024')">
+                    Lancet 2024 IPD
+                    <span>9 trials (n=1114)</span>
+                </button>
+                <button class="preset-btn" onclick="setPreset('vaecmo')">
+                    VA-ECMO Only
+                    <span>4 trials (n=611)</span>
+                </button>
+                <button class="preset-btn" onclick="setPreset('unloading')">
+                    LV Unloading
+                    <span>5 trials (n=503)</span>
+                </button>
+                <button class="preset-btn" onclick="setPreset('lowArrest')">
+                    Low Brain Injury
+                    <span>DanGer-like</span>
+                </button>
+            </div>
+            
+            <div class="toggle-row">
+                <label for="arrestToggle" class="toggle-label" style="font-size: 0.8rem; cursor: pointer;">Exclude high arrest (>50%)</label>
+                <div class="toggle" id="arrestToggle" onclick="toggleArrest()" role="switch" aria-checked="false" tabindex="0"></div>
+            </div>
+            
+            <div class="section-title">
+                Trial Database
+                <span style="color: var(--accent-cyan); margin-left: auto;" id="selectedCount">5 selected</span>
+            </div>
+            
+            <div class="trial-grid" id="trialList"></div>
+        </div>
+        
+        <!-- CENTER PANEL: Visualization -->
+        <div class="center-panel">
+            <div class="forest-header">
+                <div class="forest-title">Random Effects Meta-Analysis (DerSimonian-Laird)</div>
+                <button class="action-btn" onclick="downloadForestPlot()">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5 5 5 5-5m-5 5V3"/></svg>
+                    Export Plot
+                </button>
+            </div>
+            
+            <div class="forest-container" id="forestContainer">
+                <canvas id="forestPlot"></canvas>
+                <div id="forestTooltip"></div>
+            </div>
+            
+            <div class="results-grid">
+                <div class="result-card">
+                    <div class="result-value" id="pooledHR">0.87</div>
+                    <div class="result-ci" id="pooledCI">0.74–1.03</div>
+                    <div class="result-label">Pooled HR</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-value" id="predInt">0.58–1.30</div>
+                    <div class="result-ci">95% PI</div>
+                    <div class="result-label">Prediction Int</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-value" id="hetI2">42%</div>
+                    <div class="result-ci" id="hetTau">τ²=0.03</div>
+                    <div class="result-label">Heterogeneity</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-value" id="totalN">924</div>
+                    <div class="result-ci" id="trialCount">5 trials</div>
+                    <div class="result-label">Population</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-value" id="pValue">0.10</div>
+                    <div class="result-ci" id="sigNote">Not significant</div>
+                    <div class="result-label">P-value</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- RIGHT PANEL: Interpretation -->
+        <div class="panel">
+            <div class="panel-header" style="font-size: 1.2rem;">GRADE Assessment</div>
+            
+            <div id="gradeContainer">
+                <!-- Populated by JS -->
+            </div>
+            
+            <div class="section-title">Translation (per 100 patients)</div>
+            <div class="viz-card">
+                <div class="viz-title">
+                    <span style="background: var(--accent-cyan); padding: 4px; border-radius: 4px; margin-right: 8px;">📊</span>
+                    Clinical Impact
+                </div>
+                <div class="waffle-container" id="waffleChart"></div>
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.7rem; color: var(--text-secondary);">
+                    <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 8px; height: 8px; background: var(--accent-success); border-radius: 2px;"></div>Lives Saved</div>
+                    <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 8px; height: 8px; background: var(--accent-danger); border-radius: 2px;"></div>Excess Deaths</div>
+                    <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 8px; height: 8px; background: var(--accent-orange); border-radius: 2px;"></div>Major Bleed</div>
+                    <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 8px; height: 8px; background: var(--text-muted); border-radius: 2px;"></div>Standard Mort.</div>
+                </div>
+            </div>
+            
+            <div class="viz-card">
+                <div class="viz-title">
+                    <span style="background: var(--accent-blue); padding: 4px; border-radius: 4px; margin-right: 8px;">🎲</span>
+                    Monte Carlo Net Benefit
+                </div>
+                <div style="height: 100px; position: relative;">
+                    <canvas id="mcChart"></canvas>
+                    <div style="position: absolute; top: 0; right: 0; font-family: 'JetBrains Mono'; font-size: 0.75rem; background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;" id="mcProb">P(benefit)=68%</div>
+                </div>
+            </div>
+            
+            <div class="section-title">Sensitivity Parameters</div>
+            <div class="slider-group">
+                <div class="slider-header">
+                    <label for="mortSlider">Baseline 6-month mortality</label>
+                    <span class="slider-value" id="mortValue">55%</span>
+                </div>
+                <input type="range" min="30" max="80" value="55" id="mortSlider" oninput="updateParams()">
+            </div>
+            <div class="slider-group">
+                <div class="slider-header">
+                    <label for="bleedSlider">Bleeding OR multiplier</label>
+                    <span class="slider-value" id="bleedValue">2.6×</span>
+                </div>
+                <input type="range" min="10" max="50" value="26" id="bleedSlider" oninput="updateParams()">
+            </div>
+            
+            <div style="margin-top: auto; padding-top: 20px; font-size: 0.65rem; color: var(--text-muted); border-top: 1px solid var(--border-color);">
+                <strong>Methodology:</strong> DerSimonian-Laird Random Effects. <br>
+                Haldane-Anscombe correction applied for zero events.<br>
+                NCB = ARR(mortality) - 0.3 × ARI(bleeding).
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    // ============================================
+    // DATA MODEL: EVIDENCE DATABASE
+    // ============================================
+    const TRIALS = [
+        {
+            id: 'ecls_shock_i', name: 'ECLS-SHOCK I', year: 2011, journal: 'Clin Res Cardiol',
+            device: 'VA-ECMO', deviceClass: 'ecmo', controlType: 'medical',
+            n: 42, events_mcs: 8, events_ctrl: 10,
+            hr: 0.68, hr_lower: 0.27, hr_upper: 1.73,
+            arrestProp: 0.35, riskOfBias: 'Moderate',
+            result: 'neutral'
+        },
+        {
+            id: 'ecls_shock', name: 'ECLS-SHOCK II', year: 2023, journal: 'NEJM',
+            device: 'VA-ECMO', deviceClass: 'ecmo', controlType: 'medical',
+            n: 417, events_mcs: 100, events_ctrl: 102,
+            hr: 0.98, hr_lower: 0.80, hr_upper: 1.19,
+            arrestProp: 0.78, riskOfBias: 'Low',
+            result: 'neutral'
+        },
+        {
+            id: 'ecmo_cs', name: 'ECMO-CS', year: 2023, journal: 'Circulation',
+            device: 'VA-ECMO', deviceClass: 'ecmo', controlType: 'medical',
+            n: 117, events_mcs: 29, events_ctrl: 28,
+            hr: 1.11, hr_lower: 0.66, hr_upper: 1.87,
+            arrestProp: 0.42, riskOfBias: 'Low',
+            result: 'neutral'
+        },
+        {
+            id: 'euro_shock', name: 'EURO SHOCK', year: 2023, journal: 'EuroInterv',
+            device: 'VA-ECMO', deviceClass: 'ecmo', controlType: 'medical',
+            n: 35, events_mcs: 7, events_ctrl: 11,
+            hr: 0.56, hr_lower: 0.21, hr_upper: 1.45,
+            arrestProp: 0.35, riskOfBias: 'High',
+            result: 'neutral'
+        },
+        {
+            id: 'danger_shock', name: 'DanGer Shock', year: 2024, journal: 'NEJM',
+            device: 'Impella CP', deviceClass: 'impella', controlType: 'medical',
+            n: 355, events_mcs: 82, events_ctrl: 103,
+            hr: 0.74, hr_lower: 0.55, hr_upper: 0.99,
+            arrestProp: 0.05, riskOfBias: 'Low',
+            result: 'positive'
+        },
+        {
+            id: 'impress', name: 'IMPRESS', year: 2017, journal: 'JACC',
+            device: 'Impella CP', deviceClass: 'impella', controlType: 'iabp',
+            n: 48, events_mcs: 11, events_ctrl: 12,
+            hr: 0.96, hr_lower: 0.42, hr_upper: 2.18,
+            arrestProp: 0.92, riskOfBias: 'Moderate',
+            result: 'neutral'
+        },
+        {
+            id: 'seyfarth_2008', name: 'ISAR-SHOCK', year: 2008, journal: 'JACC',
+            device: 'Impella 2.5', deviceClass: 'impella', controlType: 'iabp',
+            n: 26, events_mcs: 6, events_ctrl: 6,
+            hr: 1.00, hr_lower: 0.32, hr_upper: 3.12,
+            arrestProp: 0.50, riskOfBias: 'High',
+            result: 'neutral'
+        },
+        {
+            id: 'thiele_2005', name: 'Thiele 2005', year: 2005, journal: 'EHJ',
+            device: 'TandemHeart', deviceClass: 'tandem', controlType: 'iabp',
+            n: 41, events_mcs: 9, events_ctrl: 9,
+            hr: 0.96, hr_lower: 0.38, hr_upper: 2.43,
+            arrestProp: 0.40, riskOfBias: 'High',
+            result: 'neutral'
+        },
+        {
+            id: 'burkhoff_2006', name: 'Burkhoff 2006', year: 2006, journal: 'AHJ',
+            device: 'TandemHeart', deviceClass: 'tandem', controlType: 'iabp',
+            n: 33, events_mcs: 8, events_ctrl: 5,
+            hr: 1.18, hr_lower: 0.38, hr_upper: 3.61,
+            arrestProp: 0.45, riskOfBias: 'High',
+            result: 'neutral'
+        }
+    ];
+
+    // Enrich objects with getters for stats
+    TRIALS.forEach(t => {
+        Object.defineProperty(t, 'logHR', {
+            get: function() { 
+                return Math.log(this.hr); 
+            }
+        });
+        Object.defineProperty(t, 'seLogHR', {
+            get: function() { return (Math.log(this.hr_upper) - Math.log(this.hr_lower)) / 3.92; }
+        });
+    });
+
+    // State
+    let state = {
+        selected: ['ecls_shock_i', 'ecls_shock', 'ecmo_cs', 'euro_shock', 'danger_shock', 'impress', 'seyfarth_2008', 'thiele_2005', 'burkhoff_2006'],
+        excludeHighArrest: false,
+        baselineMort: 55,
+        bleedingOR: 2.6,
+        hoverTrial: null
+    };
+
+    // ============================================
+    // STATISTICS ENGINE
+    // ============================================
+    function calculatePooled(trials) {
+        if (trials.length === 0) return null;
+        
+        let active = trials;
+        
+        if (active.length === 1) {
+            const t = active[0];
+            return {
+                HR: t.hr, HR_lower: t.hr_lower, HR_upper: t.hr_upper,
+                logHR: t.logHR, seLogHR: t.seLogHR, // ADDED MISSING PROPS
+                I2: 0, tau2: 0, k: 1, totalN: t.n,
+                pValue: 2 * (1 - normCDF(Math.abs(t.logHR / t.seLogHR))),
+                PI_lower: t.hr_lower, PI_upper: t.hr_upper,
+                weights: [100]
+            };
+        }
+        
+        // Fixed effect weights
+        let sumW = 0, sumWY = 0, sumW2 = 0;
+        active.forEach(t => {
+            const w = 1 / (t.seLogHR ** 2);
+            sumW += w; sumWY += w * t.logHR; sumW2 += w ** 2;
+        });
+        const thetaFE = sumWY / sumW;
+        
+        // Q statistic & Tau²
+        let Q = 0;
+        active.forEach(t => {
+            const w = 1 / (t.seLogHR ** 2);
+            Q += w * ((t.logHR - thetaFE) ** 2);
+        });
+        
+        const k = active.length;
+        const C = sumW - (sumW2 / sumW);
+        const tau2 = Math.max(0, (Q - (k - 1)) / C);
+        
+        // Random effects
+        let sumWRE = 0, sumWYRE = 0;
+        const weights = [];
+        active.forEach(t => {
+            const wRE = 1 / (t.seLogHR ** 2 + tau2);
+            sumWRE += wRE;
+            sumWYRE += wRE * t.logHR;
+            weights.push(wRE);
+        });
+        
+        // Normalize weights
+        const totalW = weights.reduce((a,b)=>a+b,0);
+        const normWeights = weights.map(w => (w/totalW)*100);
+
+        const thetaRE = sumWYRE / sumWRE;
+        const seRE = Math.sqrt(1 / sumWRE);
+        const I2 = Q > (k - 1) ? ((Q - (k - 1)) / Q) * 100 : 0;
+        
+        // 95% Prediction Interval
+        const tCrit = k > 2 ? tQuantile(0.975, k - 2) : 4.303;
+        const piSE = Math.sqrt(seRE ** 2 + tau2);
+        
+        return {
+            HR: Math.exp(thetaRE),
+            HR_lower: Math.exp(thetaRE - 1.96 * seRE),
+            HR_upper: Math.exp(thetaRE + 1.96 * seRE),
+            logHR: thetaRE, // ADDED MISSING PROP
+            seLogHR: seRE,  // ADDED MISSING PROP
+            PI_lower: Math.exp(thetaRE - tCrit * piSE),
+            PI_upper: Math.exp(thetaRE + tCrit * piSE),
+            I2, tau2, k, 
+            totalN: active.reduce((s, t) => s + t.n, 0),
+            pValue: 2 * (1 - normCDF(Math.abs(thetaRE / seRE))),
+            weights: normWeights
+        };
+    }
+    
+    // Helper Math
+    function normCDF(x) {
+        const t = 1 / (1 + 0.3275911 * Math.abs(x) / Math.sqrt(2));
+        const d = 0.254829592 * t - 0.284496736 * t**2 + 1.421413741 * t**3 - 1.453152027 * t**4 + 1.061405429 * t**5;
+        const y = 1 - d * Math.exp(-x*x/2);
+        return x < 0 ? 1 - y : y;
+    }
+    
+    function tQuantile(p, df) {
+        // Approximate t-distribution inverse
+        if (df >= 100) return 1.96;
+        if (df <= 1) return 12.71;
+        const map = {2:4.30, 3:3.18, 4:2.78, 5:2.57, 6:2.45, 7:2.36, 8:2.31, 9:2.26, 10:2.23};
+        return map[Math.round(df)] || 2.1;
+    }
+
+    // ============================================
+    // LOGIC & CONTROLS
+    // ============================================
+    function getFilteredTrials() {
+        return TRIALS.filter(t => {
+            if (state.excludeHighArrest && t.arrestProp > 0.5) return false;
+            return state.selected.includes(t.id);
+        });
+    }
+
+    function setPreset(key) {
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+        
+        switch(key) {
+            case 'lancet2024': state.selected = ['ecls_shock_i', 'ecls_shock', 'ecmo_cs', 'euro_shock', 'danger_shock', 'impress', 'seyfarth_2008', 'thiele_2005', 'burkhoff_2006']; break;
+            case 'vaecmo': state.selected = ['ecls_shock_i', 'ecls_shock', 'ecmo_cs', 'euro_shock']; break;
+            case 'unloading': state.selected = ['danger_shock', 'impress', 'seyfarth_2008', 'thiele_2005', 'burkhoff_2006']; break;
+            case 'lowArrest': state.selected = ['danger_shock', 'euro_shock', 'ecls_shock_i', 'thiele_2005']; break;
+        }
+        updateUI();
+    }
+
+    function toggleArrest() {
+        state.excludeHighArrest = !state.excludeHighArrest;
+        document.getElementById('arrestToggle').classList.toggle('active', state.excludeHighArrest);
+        document.getElementById('arrestToggle').setAttribute('aria-checked', state.excludeHighArrest);
+        updateUI();
+    }
+
+    function updateParams() {
+        state.baselineMort = parseInt(document.getElementById('mortSlider').value);
+        state.bleedingOR = parseInt(document.getElementById('bleedSlider').value) / 10;
+        document.getElementById('mortValue').textContent = state.baselineMort + '%';
+        document.getElementById('bleedValue').textContent = state.bleedingOR.toFixed(1) + '×';
+        updateUI();
+    }
+
+    // ============================================
+    // RENDERING: TRIALS & FOREST
+    // ============================================
+    function renderTrialList() {
+        const container = document.getElementById('trialList');
+        container.innerHTML = '';
+        
+        TRIALS.forEach(t => {
+            const isSelected = state.selected.includes(t.id);
+            const isExcluded = state.excludeHighArrest && t.arrestProp > 0.5;
+            
+            const div = document.createElement('div');
+            div.className = `trial-item ${isSelected && !isExcluded ? 'selected' : ''} ${isExcluded ? 'excluded' : ''} trial-sig-${t.result}`;
+            div.innerHTML = `
+                <div class="trial-header">
+                    <span>
+                        <span class="trial-name">${t.name}</span>
+                        <span class="trial-year">${t.year}</span>
+                    </span>
+                    <span class="trial-device device-${t.deviceClass}">${t.device}</span>
+                </div>
+                <div class="trial-stats">
+                    <div class="trial-stat">
+                        <div class="trial-stat-value">${t.n}</div>
+                        <div class="trial-stat-label">N</div>
+                    </div>
+                    <div class="trial-stat">
+                        <div class="trial-stat-value" style="color:${t.result === 'positive' ? 'var(--accent-success)' : 'inherit'}">${t.hr.toFixed(2)}</div>
+                        <div class="trial-stat-label">HR</div>
+                    </div>
+                    <div class="trial-stat">
+                        <div class="trial-stat-value">${Math.round(t.arrestProp*100)}%</div>
+                        <div class="trial-stat-label">Arrest</div>
+                    </div>
+                    <div class="trial-stat">
+                        <div class="trial-stat-value" style="color:var(--text-muted)">${t.controlType === 'iabp' ? 'IABP' : 'MED'}</div>
+                        <div class="trial-stat-label">Ctrl</div>
+                    </div>
+                </div>
+            `;
+            
+            if (!isExcluded) {
+                div.onclick = () => {
+                    if (state.selected.includes(t.id)) state.selected = state.selected.filter(id => id !== t.id);
+                    else state.selected.push(t.id);
+                    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                    updateUI();
+                };
+            }
+            container.appendChild(div);
+        });
+        document.getElementById('selectedCount').textContent = `${getFilteredTrials().length} selected`;
+    }
+
+    // Canvas Variables for Interaction
+    let plotMetrics = { scale: 1, trials: [], pooled: null, margin: {}, rowHeight: 0 };
+
+    function renderForest() {
+        const canvas = document.getElementById('forestPlot');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('forestContainer');
+        const dpr = window.devicePixelRatio || 1;
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        ctx.scale(dpr, dpr);
+        
+        // Background
+        ctx.fillStyle = '#0a0d12';
+        ctx.fillRect(0, 0, w, h);
+
+        const trials = getFilteredTrials();
+        const pooled = calculatePooled(trials);
+        
+        // Save metrics for hover
+        const margin = { top: 40, right: 60, bottom: 50, left: 160 };
+        const rowHeight = Math.min(40, (h - margin.top - margin.bottom) / (trials.length + 1.5));
+        
+        plotMetrics = { 
+            scale: w - margin.left - margin.right, 
+            xMin: 0.2, xMax: 3.0,
+            margin, rowHeight, trials, pooled
+        };
+
+        const xScale = (val) => {
+            const logVal = Math.log10(val);
+            const logMin = Math.log10(plotMetrics.xMin);
+            const logMax = Math.log10(plotMetrics.xMax);
+            return margin.left + ((logVal - logMin) / (logMax - logMin)) * plotMetrics.scale;
+        };
+
+        // Grid
+        ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1;
+        [0.25, 0.5, 1, 2].forEach(v => {
+            const x = xScale(v);
+            ctx.beginPath(); ctx.moveTo(x, margin.top); ctx.lineTo(x, h - margin.bottom); ctx.stroke();
+            // Axis Label
+            ctx.fillStyle = '#64748b'; ctx.font = '10px JetBrains Mono'; ctx.textAlign = 'center';
+            ctx.fillText(v, x, h - margin.bottom + 15);
+        });
+
+        // Null line
+        ctx.strokeStyle = '#64748b'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(xScale(1), margin.top); ctx.lineTo(xScale(1), h - margin.bottom); ctx.stroke();
+
+        if (!pooled) {
+            ctx.fillStyle = '#94a3b8'; ctx.font = '16px Outfit'; ctx.textAlign = 'center';
+            ctx.fillText('Select trials to analyze', w/2, h/2);
+            return;
+        }
+
+        // Draw Trials
+        trials.forEach((t, i) => {
+            const y = margin.top + i * rowHeight + rowHeight/2;
+            const x = xScale(t.hr);
+            const xLo = xScale(Math.max(0.2, t.hr_lower));
+            const xHi = xScale(Math.min(3.0, t.hr_upper));
+            
+            // Hover Highlight
+            if (state.hoverTrial === i) {
+                ctx.fillStyle = 'rgba(6, 182, 212, 0.1)';
+                ctx.fillRect(10, y - rowHeight/2 + 2, w - 20, rowHeight - 4);
+            }
+
+            // CI Line
+            ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(xLo, y); ctx.lineTo(xHi, y); ctx.stroke();
+            
+            // Box
+            const weight = pooled.weights[i];
+            const size = 4 + (weight/Math.max(...pooled.weights)) * 6;
+            ctx.fillStyle = t.deviceClass === 'ecmo' ? '#8b5cf6' : t.deviceClass === 'impella' ? '#06b6d4' : '#3b82f6';
+            ctx.fillRect(x - size/2, y - size/2, size, size);
+            
+            // Text
+            ctx.fillStyle = '#f0f4f8'; ctx.font = '12px Outfit'; ctx.textAlign = 'right';
+            ctx.fillText(t.name, margin.left - 10, y + 4);
+            
+            // HR Text
+            ctx.fillStyle = '#94a3b8'; ctx.font = '11px JetBrains Mono'; ctx.textAlign = 'left';
+            ctx.fillText(`${t.hr.toFixed(2)} [${t.hr_lower.toFixed(2)}-${t.hr_upper.toFixed(2)}]`, w - margin.right + 10, y + 4);
+        });
+
+        // Pooled Diamond
+        const yP = margin.top + trials.length * rowHeight + rowHeight * 0.8;
+        const xP = xScale(pooled.HR);
+        const xPLo = xScale(pooled.HR_lower);
+        const xPHi = xScale(pooled.HR_upper);
+        
+        ctx.fillStyle = '#f0f4f8';
+        ctx.beginPath();
+        ctx.moveTo(xPLo, yP); ctx.lineTo(xP, yP - 8); ctx.lineTo(xPHi, yP); ctx.lineTo(xP, yP + 8);
+        ctx.fill();
+
+        // PI
+        if (pooled.k > 2) {
+            ctx.strokeStyle = '#f97316'; ctx.setLineDash([4, 4]); ctx.lineWidth = 2;
+            const xPiLo = xScale(Math.max(0.2, pooled.PI_lower));
+            const xPiHi = xScale(Math.min(3.0, pooled.PI_upper));
+            ctx.beginPath(); ctx.moveTo(xPiLo, yP + 12); ctx.lineTo(xPiHi, yP + 12); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        ctx.font = 'bold 12px Outfit'; ctx.fillStyle = '#f0f4f8'; ctx.textAlign = 'right';
+        ctx.fillText("Pooled Effect", margin.left - 10, yP + 4);
+        
+        // Direction Labels
+        ctx.fillStyle = '#64748b'; ctx.font = '11px Outfit';
+        ctx.textAlign = 'left'; ctx.fillText('← Favors MCS', xScale(0.25), h - 10);
+        ctx.textAlign = 'right'; ctx.fillText('Favors Control →', xScale(2.5), h - 10);
+    }
+
+    // Interaction Logic
+    const forestEl = document.getElementById('forestPlot');
+    const tooltip = document.getElementById('forestTooltip');
+
+    forestEl.addEventListener('mousemove', (e) => {
+        const rect = forestEl.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const m = plotMetrics;
+        
+        if (!m.trials || m.trials.length === 0) return;
+
+        // Calculate hovered row
+        const index = Math.floor((y - m.margin.top) / m.rowHeight);
+        
+        if (index >= 0 && index < m.trials.length) {
+            state.hoverTrial = index;
+            const t = m.trials[index];
+            const w = m.pooled.weights[index].toFixed(1);
+            
+            tooltip.style.left = (e.clientX + 15) + 'px';
+            tooltip.style.top = (e.clientY + 10) + 'px';
+            tooltip.style.opacity = 1;
+            tooltip.innerHTML = `
+                <h4>${t.name} (${t.year})</h4>
+                <div class="tt-row"><span>Events</span> <span class="tt-val">${t.events_mcs}/${t.n} vs ${t.events_ctrl}/${t.n}</span></div>
+                <div class="tt-row"><span>Weight</span> <span class="tt-val">${w}%</span></div>
+                <div class="tt-row"><span>Arrest</span> <span class="tt-val">${Math.round(t.arrestProp*100)}%</span></div>
+            `;
+            renderForest();
+        } else {
+            state.hoverTrial = null;
+            tooltip.style.opacity = 0;
+            renderForest();
+        }
+    });
+
+    forestEl.addEventListener('mouseleave', () => {
+        state.hoverTrial = null;
+        tooltip.style.opacity = 0;
+        renderForest();
+    });
+
+    // ============================================
+    // VISUALIZATIONS & GRADE
+    // ============================================
+    function renderGRADE() {
+        const trials = getFilteredTrials();
+        const pooled = calculatePooled(trials);
+        const container = document.getElementById('gradeContainer');
+        
+        if(!pooled) { container.innerHTML = ''; return; }
+        
+        // GRADE Engine Logic
+        let level = 4; // Start High
+        let reasons = [];
+        
+        // 1. Inconsistency (I2)
+        if (pooled.I2 > 50) { level--; reasons.push("Inconsistency (I² > 50%)"); }
+        if (pooled.I2 > 75) { level--; reasons.push("Severe Inconsistency"); }
+        
+        // 2. Imprecision (Confidence Interval)
+        const ciWidth = Math.log(pooled.HR_upper) - Math.log(pooled.HR_lower);
+        if (ciWidth > 0.5 && pooled.pValue > 0.05) { level--; reasons.push("Imprecision (Wide CI crossing unity)"); }
+        
+        // 3. Indirectness (Mixed Controls)
+        const hasIABP = trials.some(t => t.controlType === 'iabp');
+        const hasMed = trials.some(t => t.controlType === 'medical');
+        if (hasIABP && hasMed) { level--; reasons.push("Indirectness (Mixed control groups)"); }
+        
+        // 4. Risk of Bias
+        const highRiskCount = trials.filter(t => t.riskOfBias === 'High').length;
+        if (highRiskCount > trials.length / 2) { level--; reasons.push("Risk of Bias (Majority high risk trials)"); }
+        
+        level = Math.max(1, level);
+        const map = {4: ['High', 'grade-high'], 3: ['Moderate', 'grade-mod'], 2: ['Low', 'grade-low'], 1: ['Very Low', 'grade-very-low']};
+        
+        container.innerHTML = `
+            <div class="grade-card ${map[level][1]}">
+                <span class="grade-level">${map[level][0]} Certainty</span>
+                <div class="grade-reason">
+                    ${reasons.length ? 'Downgraded for: ' + reasons.join(", ") : 'No serious limitations detected.'}
+                </div>
+            </div>
+        `;
+    }
+
+    function renderWaffle() {
+        const trials = getFilteredTrials();
+        const pooled = calculatePooled(trials);
+        const container = document.getElementById('waffleChart');
+        container.innerHTML = '';
+        
+        if(!pooled) return;
+        
+        const baseline = state.baselineMort / 100;
+        const hr = pooled.HR;
+        const deathsBase = Math.round(baseline * 100);
+        const deathsMCS = Math.round(baseline * hr * 100);
+        
+        const livesSaved = Math.max(0, deathsBase - deathsMCS);
+        const excessDeaths = Math.max(0, deathsMCS - deathsBase);
+        
+        // Bleeding
+        const baseBleed = 0.10;
+        const riskBleedMCS = (baseBleed * state.bleedingOR) / (1 + baseBleed * (state.bleedingOR - 1));
+        const bleedExcess = Math.round((riskBleedMCS - baseBleed) * 100);
+        
+        let html = '';
+        let count = 0;
+        
+        // 1. Lives Saved (Green)
+        for(let i=0; i<livesSaved; i++) { html += cell('#22c55e'); count++; }
+        // 2. Excess Deaths (Red)
+        for(let i=0; i<excessDeaths; i++) { html += cell('#ef4444'); count++; }
+        // 3. Standard Mortality (Grey) - remaining deaths
+        for(let i=0; i<(deathsBase - livesSaved); i++) { html += cell('#475569'); count++; }
+        // 4. Bleeding (Orange) - overlay on survivors
+        for(let i=0; i<bleedExcess; i++) { html += cell('#f97316'); count++; }
+        // 5. Survivors (Dark)
+        while(count < 100) { html += cell('#1a2130'); count++; }
+        
+        container.innerHTML = html;
+    }
+    
+    function cell(color) { return `<div class="waffle-cell" style="background: ${color}"></div>`; }
+
+    function renderMonteCarlo() {
+        const ctx = document.getElementById('mcChart').getContext('2d');
+        const trials = getFilteredTrials();
+        const pooled = calculatePooled(trials);
+        
+        const w = ctx.canvas.parentElement.clientWidth;
+        const h = 100;
+        ctx.canvas.width = w * window.devicePixelRatio;
+        ctx.canvas.height = h * window.devicePixelRatio;
+        ctx.canvas.style.width = w + 'px';
+        ctx.canvas.style.height = h + 'px';
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        
+        if(!pooled) return;
+        
+        // Simulation
+        const n = 5000;
+        let benefitCount = 0;
+        const values = [];
+        
+        for(let i=0; i<n; i++) {
+            // Sample HR from Log-Normal dist
+            const logHR = pooled.logHR + pooled.seLogHR * randn(); // Using derived property
+            const hr = Math.exp(logHR);
+            
+            // Calc Benefit
+            const arr = (state.baselineMort/100) * (1 - hr);
+            
+            // Sample Bleeding
+            const or = state.bleedingOR * (1 + 0.1 * randn());
+            const baseBleed = 0.1;
+            const riskMCS = (baseBleed * or) / (1 + baseBleed * (or - 1));
+            const ari = riskMCS - baseBleed;
+            
+            // Net Clinical Benefit (Weight 0.3)
+            const ncb = arr - 0.3 * ari;
+            values.push(ncb);
+            if(ncb > 0) benefitCount++;
+        }
+        
+        // Update P(Benefit) text
+        const p = (benefitCount / n * 100).toFixed(0);
+        document.getElementById('mcProb').innerText = `P(Net Benefit) = ${p}%`;
+        
+        // Draw Histogram
+        ctx.fillStyle = '#1a2130'; ctx.fillRect(0,0,w,h);
+        
+        const bins = 40;
+        const min = -0.15, max = 0.15;
+        const range = max - min;
+        const counts = new Array(bins).fill(0);
+        
+        values.forEach(v => {
+            if(v < min || v > max) return;
+            const bin = Math.floor(((v - min) / range) * bins);
+            counts[bin]++;
+        });
+        
+        const maxC = Math.max(...counts);
+        const barW = w / bins;
+        
+        counts.forEach((c, i) => {
+            const val = min + (i/bins)*range;
+            ctx.fillStyle = val > 0 ? '#22c55e' : '#ef4444';
+            const barH = (c / maxC) * h * 0.9;
+            ctx.fillRect(i * barW, h - barH, barW - 1, barH);
+        });
+        
+        // Zero Line
+        const zeroX = ((0 - min) / range) * w;
+        ctx.strokeStyle = '#f0f4f8'; ctx.lineWidth = 1; ctx.setLineDash([2,2]);
+        ctx.beginPath(); ctx.moveTo(zeroX, 0); ctx.lineTo(zeroX, h); ctx.stroke();
+    }
+    
+    function randn() {
+        let u = 0, v = 0;
+        while(u===0) u = Math.random();
+        while(v===0) v = Math.random();
+        return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    }
+    
+    // ============================================
+    // UTILITIES
+    // ============================================
+    function renderResults() {
+        const trials = getFilteredTrials();
+        const pooled = calculatePooled(trials);
+        
+        if(!pooled) return;
+        
+        document.getElementById('pooledHR').textContent = pooled.HR.toFixed(2);
+        document.getElementById('pooledCI').textContent = `${pooled.HR_lower.toFixed(2)}–${pooled.HR_upper.toFixed(2)}`;
+        document.getElementById('predInt').textContent = `${pooled.PI_lower.toFixed(2)}–${pooled.PI_upper.toFixed(2)}`;
+        document.getElementById('hetI2').textContent = Math.round(pooled.I2) + '%';
+        document.getElementById('hetTau').textContent = `τ²=${pooled.tau2.toFixed(3)}`;
+        document.getElementById('totalN').textContent = pooled.totalN;
+        document.getElementById('trialCount').textContent = pooled.k + ' trials';
+        
+        const pv = pooled.pValue;
+        document.getElementById('pValue').textContent = pv < 0.001 ? '<0.001' : pv.toFixed(2);
+        document.getElementById('sigNote').textContent = pv < 0.05 ? 'Significant' : 'Not significant';
+        
+        // Alerts
+        const ac = document.getElementById('alertContainer');
+        ac.innerHTML = '';
+        if(pooled.I2 > 50) {
+            ac.innerHTML += `<div class="alert-banner warning"><div class="alert-title">⚠️ High Heterogeneity</div>True effect size likely varies between studies.</div>`;
+        }
+        const hasECMO = trials.some(t => t.deviceClass === 'ecmo');
+        const hasImp = trials.some(t => t.deviceClass === 'impella' || t.deviceClass === 'tandem');
+        if(hasECMO && hasImp) {
+            ac.innerHTML += `<div class="alert-banner"><div class="alert-title">⚠️ Physiological Conflict</div>Pooling Loading (ECMO) and Unloading (Impella) devices.</div>`;
+        }
+    }
+    
+    function downloadForestPlot() {
+        const canvas = document.getElementById('forestPlot');
+        const link = document.createElement('a');
+        link.download = 'MCS-Meta-Analysis.png';
+        link.href = canvas.toDataURL();
+        link.click();
+    }
+
+    function updateUI() {
+        renderTrialList();
+        renderForest();
+        renderResults();
+        renderWaffle();
+        renderMonteCarlo();
+        renderGRADE();
+    }
+    
+    // Init
+    window.addEventListener('load', updateUI);
+    window.addEventListener('resize', () => { renderForest(); renderMonteCarlo(); });
+    </script>
+</body>
+</html>
