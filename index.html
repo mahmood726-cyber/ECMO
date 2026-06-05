@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Mechanical Circulatory Support Evidence Synthesis Dashboard">
     <title>MCS-Logic v4.1 | Evidence Synthesis</title>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- fonts removed for offline use; system fonts fall back -->
     <style>
         :root {
             --bg-primary: #0a0d12;
@@ -577,6 +577,7 @@
         </div>
     </div>
     
+    <script src="engine.js"></script>
     <script>
     // ============================================
     // DATA MODEL: EVIDENCE DATABASE
@@ -680,94 +681,7 @@
     // ============================================
     // STATISTICS ENGINE
     // ============================================
-    function calculatePooled(trials) {
-        if (trials.length === 0) return null;
-        
-        let active = trials;
-        
-        if (active.length === 1) {
-            const t = active[0];
-            return {
-                HR: t.hr, HR_lower: t.hr_lower, HR_upper: t.hr_upper,
-                logHR: t.logHR, seLogHR: t.seLogHR, // ADDED MISSING PROPS
-                I2: 0, tau2: 0, k: 1, totalN: t.n,
-                pValue: 2 * (1 - normCDF(Math.abs(t.logHR / t.seLogHR))),
-                PI_lower: t.hr_lower, PI_upper: t.hr_upper,
-                weights: [100]
-            };
-        }
-        
-        // Fixed effect weights
-        let sumW = 0, sumWY = 0, sumW2 = 0;
-        active.forEach(t => {
-            const w = 1 / (t.seLogHR ** 2);
-            sumW += w; sumWY += w * t.logHR; sumW2 += w ** 2;
-        });
-        const thetaFE = sumWY / sumW;
-        
-        // Q statistic & Tau²
-        let Q = 0;
-        active.forEach(t => {
-            const w = 1 / (t.seLogHR ** 2);
-            Q += w * ((t.logHR - thetaFE) ** 2);
-        });
-        
-        const k = active.length;
-        const C = sumW - (sumW2 / sumW);
-        const tau2 = Math.max(0, (Q - (k - 1)) / C);
-        
-        // Random effects
-        let sumWRE = 0, sumWYRE = 0;
-        const weights = [];
-        active.forEach(t => {
-            const wRE = 1 / (t.seLogHR ** 2 + tau2);
-            sumWRE += wRE;
-            sumWYRE += wRE * t.logHR;
-            weights.push(wRE);
-        });
-        
-        // Normalize weights
-        const totalW = weights.reduce((a,b)=>a+b,0);
-        const normWeights = weights.map(w => (w/totalW)*100);
-
-        const thetaRE = sumWYRE / sumWRE;
-        const seRE = Math.sqrt(1 / sumWRE);
-        const I2 = Q > (k - 1) ? ((Q - (k - 1)) / Q) * 100 : 0;
-        
-        // 95% Prediction Interval
-        const tCrit = k > 2 ? tQuantile(0.975, k - 2) : 4.303;
-        const piSE = Math.sqrt(seRE ** 2 + tau2);
-        
-        return {
-            HR: Math.exp(thetaRE),
-            HR_lower: Math.exp(thetaRE - 1.96 * seRE),
-            HR_upper: Math.exp(thetaRE + 1.96 * seRE),
-            logHR: thetaRE, // ADDED MISSING PROP
-            seLogHR: seRE,  // ADDED MISSING PROP
-            PI_lower: Math.exp(thetaRE - tCrit * piSE),
-            PI_upper: Math.exp(thetaRE + tCrit * piSE),
-            I2, tau2, k, 
-            totalN: active.reduce((s, t) => s + t.n, 0),
-            pValue: 2 * (1 - normCDF(Math.abs(thetaRE / seRE))),
-            weights: normWeights
-        };
-    }
-    
-    // Helper Math
-    function normCDF(x) {
-        const t = 1 / (1 + 0.3275911 * Math.abs(x) / Math.sqrt(2));
-        const d = 0.254829592 * t - 0.284496736 * t**2 + 1.421413741 * t**3 - 1.453152027 * t**4 + 1.061405429 * t**5;
-        const y = 1 - d * Math.exp(-x*x/2);
-        return x < 0 ? 1 - y : y;
-    }
-    
-    function tQuantile(p, df) {
-        // Approximate t-distribution inverse
-        if (df >= 100) return 1.96;
-        if (df <= 1) return 12.71;
-        const map = {2:4.30, 3:3.18, 4:2.78, 5:2.57, 6:2.45, 7:2.36, 8:2.31, 9:2.26, 10:2.23};
-        return map[Math.round(df)] || 2.1;
-    }
+    // Statistical core (calculatePooled, normCDF, tQuantile) lives in engine.js
 
     // ============================================
     // LOGIC & CONTROLS
